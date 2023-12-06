@@ -28,9 +28,7 @@ from pypinyin import load_single_dict
 from pypinyin import Style
 from pypinyin_dict.phrase_pinyin_data import large_pinyin
 
-from paddlespeech.t2s.frontend.g2pw import G2PWOnnxConverter
 from paddlespeech.t2s.frontend.generate_lexicon import generate_lexicon
-from paddlespeech.t2s.frontend.rhy_prediction.rhy_predictor import RhyPredictor
 from paddlespeech.t2s.frontend.tone_sandhi import ToneSandhi
 from paddlespeech.t2s.frontend.zh_normalization.text_normlization import TextNormalizer
 from paddlespeech.t2s.ssml.xml_processor import MixTextProcessor
@@ -110,6 +108,7 @@ class Frontend():
         }
         self.use_rhy = use_rhy
         if use_rhy:
+            from paddlespeech.t2s.frontend.rhy_prediction.rhy_predictor import RhyPredictor
             self.rhy_predictor = RhyPredictor()
             print("Rhythm predictor loaded.")
         # g2p_model can be pypinyin and g2pM and g2pW
@@ -123,6 +122,8 @@ class Frontend():
             self._init_pypinyin()
             self.corrector = Polyphonic()
             self.g2pM_model = G2pM()
+
+            from paddlespeech.t2s.frontend.g2pw import G2PWOnnxConverter
             self.g2pW_model = G2PWOnnxConverter(
                 style='pinyin', enable_non_tradional_chinese=True)
             self.pinyin2phone = generate_lexicon(
