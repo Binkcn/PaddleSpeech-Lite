@@ -19,19 +19,19 @@ from typing import List
 
 import jieba.posseg as psg
 import numpy as np
-import paddle
 import yaml
 from g2pM import G2pM
 from pypinyin import lazy_pinyin
 from pypinyin import load_phrases_dict
 from pypinyin import load_single_dict
 from pypinyin import Style
-from pypinyin_dict.phrase_pinyin_data import large_pinyin
 
 from paddlespeech.t2s.frontend.generate_lexicon import generate_lexicon
 from paddlespeech.t2s.frontend.tone_sandhi import ToneSandhi
 from paddlespeech.t2s.frontend.zh_normalization.text_normlization import TextNormalizer
 from paddlespeech.t2s.ssml.xml_processor import MixTextProcessor
+
+
 
 INITIALS = [
     'b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'zh', 'ch', 'sh',
@@ -83,6 +83,7 @@ class Frontend():
                  phone_vocab_path=None,
                  tone_vocab_path=None,
                  use_rhy=False):
+
         self.mix_ssml_processor = MixTextProcessor()
         self.tone_modifier = ToneSandhi()
         self.text_normalizer = TextNormalizer()
@@ -111,6 +112,7 @@ class Frontend():
             from paddlespeech.t2s.frontend.rhy_prediction.rhy_predictor import RhyPredictor
             self.rhy_predictor = RhyPredictor()
             print("Rhythm predictor loaded.")
+
         # g2p_model can be pypinyin and g2pM and g2pW
         self.g2p_model = g2p_model
         if self.g2p_model == "g2pM":
@@ -119,6 +121,7 @@ class Frontend():
                 with_tone=True, with_erhua=False)
         elif self.g2p_model == "g2pW":
             # use pypinyin as backup for non polyphonic characters in g2pW
+
             self._init_pypinyin()
             self.corrector = Polyphonic()
             self.g2pM_model = G2pM()
@@ -126,11 +129,15 @@ class Frontend():
             from paddlespeech.t2s.frontend.g2pw import G2PWOnnxConverter
             self.g2pW_model = G2PWOnnxConverter(
                 style='pinyin', enable_non_tradional_chinese=True)
+
             self.pinyin2phone = generate_lexicon(
                 with_tone=True, with_erhua=False)
 
         else:
             self._init_pypinyin()
+
+        
+
         self.must_erhua = {
             "小院儿", "胡同儿", "范儿", "老汉儿", "撒欢儿", "寻老礼儿", "妥妥儿", "媳妇儿"
         }
@@ -139,23 +146,25 @@ class Frontend():
             "拐儿", "聋儿", "乞儿", "患儿", "幼儿", "孤儿", "婴儿", "婴幼儿", "连体儿", "脑瘫儿",
             "流浪儿", "体弱儿", "混血儿", "蜜雪儿", "舫儿", "祖儿", "美儿", "应采儿", "可儿", "侄儿",
             "孙儿", "侄孙儿", "女儿", "男儿", "红孩儿", "花儿", "虫儿", "马儿", "鸟儿", "猪儿", "猫儿",
-            "狗儿"
+            "狗儿", "少儿"
         }
 
         self.vocab_phones = {}
         self.vocab_tones = {}
         if phone_vocab_path:
-            with open(phone_vocab_path, 'rt') as f:
+            with open(phone_vocab_path, 'rt', encoding='utf-8') as f:
                 phn_id = [line.strip().split() for line in f.readlines()]
             for phn, id in phn_id:
                 self.vocab_phones[phn] = int(id)
         if tone_vocab_path:
-            with open(tone_vocab_path, 'rt') as f:
+            with open(tone_vocab_path, 'rt', encoding='utf-8') as f:
                 tone_id = [line.strip().split() for line in f.readlines()]
             for tone, id in tone_id:
                 self.vocab_tones[tone] = int(id)
 
     def _init_pypinyin(self):
+        from pypinyin_dict.phrase_pinyin_data import large_pinyin
+
         large_pinyin.load()
         load_phrases_dict(self.phrases_dict)
         # 调整字的拼音顺序
@@ -536,7 +545,7 @@ class Frontend():
                       print_info: bool=False,
                       add_blank: bool=False,
                       blank_token: str="<pad>",
-                      to_tensor: bool=True) -> Dict[str, List[paddle.Tensor]]:
+                      to_tensor: bool=True):
 
         phonemes = self.get_phonemes(
             sentence,
@@ -559,13 +568,13 @@ class Frontend():
             if tones:
                 tone_ids = self._t2id(tones)
                 if to_tensor:
-                    tone_ids = paddle.to_tensor(tone_ids)
+                    tone_ids = self.to_tensor(tone_ids)
                 temp_tone_ids.append(tone_ids)
             if phones:
                 phone_ids = self._p2id(phones)
                 # if use paddle.to_tensor() in onnxruntime, the first time will be too low
                 if to_tensor:
-                    phone_ids = paddle.to_tensor(phone_ids)
+                    phone_ids = self.to_tensor(phone_ids)
                 temp_phone_ids.append(phone_ids)
         if temp_tone_ids:
             result["tone_ids"] = temp_tone_ids
@@ -583,7 +592,7 @@ class Frontend():
             print_info: bool=False,
             add_blank: bool=False,
             blank_token: str="<pad>",
-            to_tensor: bool=True) -> Dict[str, List[paddle.Tensor]]:
+            to_tensor: bool=True):
 
         l_inputs = MixTextProcessor.get_pinyin_split(sentence)
         phonemes = self.get_phonemes_ssml(
@@ -605,16 +614,20 @@ class Frontend():
             if tones:
                 tone_ids = self._t2id(tones)
                 if to_tensor:
-                    tone_ids = paddle.to_tensor(tone_ids)
+                    tone_ids = self.to_tensor(tone_ids)
                 temp_tone_ids.append(tone_ids)
             if phones:
                 phone_ids = self._p2id(phones)
                 # if use paddle.to_tensor() in onnxruntime, the first time will be too low
                 if to_tensor:
-                    phone_ids = paddle.to_tensor(phone_ids)
+                    phone_ids = self.to_tensor(phone_ids)
                 temp_phone_ids.append(phone_ids)
         if temp_tone_ids:
             result["tone_ids"] = temp_tone_ids
         if temp_phone_ids:
             result["phone_ids"] = temp_phone_ids
         return result
+
+    def to_tensor(self, data):
+        import paddle
+        return paddle.to_tensor(data)
